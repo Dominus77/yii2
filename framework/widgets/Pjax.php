@@ -127,12 +127,12 @@ class Pjax extends Widget
             $view->head();
             $view->beginBody();
             if ($view->title !== null) {
-                return Html::tag('title', Html::encode($view->title));
+                echo Html::tag('title', Html::encode($view->title));
             }
         } else {
             $options = $this->options;
             $tag = ArrayHelper::remove($options, 'tag', 'div');
-            return Html::beginTag($tag, array_merge([
+            echo Html::beginTag($tag, array_merge([
                 'data-pjax-container' => '',
                 'data-pjax-push-state' => $this->enablePushState,
                 'data-pjax-replace-state' => $this->enableReplaceState,
@@ -148,7 +148,7 @@ class Pjax extends Widget
     public function run()
     {
         if (!$this->requiresPjax()) {
-            return Html::endTag(ArrayHelper::remove($this->options, 'tag', 'div'));
+            echo Html::endTag(ArrayHelper::remove($this->options, 'tag', 'div'));
             $this->registerClientScript();
 
             return;
@@ -168,7 +168,6 @@ class Pjax extends Widget
         $response->format = Response::FORMAT_HTML;
         $response->content = $content;
         $response->headers->setDefault('X-Pjax-Url', Yii::$app->request->url);
-        $response->send();
 
         Yii::$app->end();
     }
@@ -205,7 +204,7 @@ class Pjax extends Widget
         if ($this->formSelector !== false) {
             $formSelector = Json::htmlEncode($this->formSelector !== null ? $this->formSelector : '#' . $id . ' form[data-pjax]');
             $submitEvent = Json::htmlEncode($this->submitEvent);
-            $js .= "\njQuery(document).on($submitEvent, $formSelector, function (event) {jQuery.pjax.submit(event, $options);});";
+            $js .= "\njQuery(document).off($submitEvent, $formSelector).on($submitEvent, $formSelector, function (event) {jQuery.pjax.submit(event, $options);});";
         }
         $view = $this->getView();
         PjaxAsset::register($view);

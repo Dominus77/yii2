@@ -38,7 +38,33 @@ SQL;
 
         $dt = $schema->columns['dt'];
 
-        $this->assertInstanceOf(Expression::className(),$dt->defaultValue);
+        $this->assertInstanceOf(Expression::className(), $dt->defaultValue);
+        $this->assertEquals('CURRENT_TIMESTAMP', (string)$dt->defaultValue);
+    }
+
+    public function testDefaultDatetimeColumnWithMicrosecs()
+    {
+        if (!version_compare($this->getConnection()->pdo->getAttribute(\PDO::ATTR_SERVER_VERSION), '5.6.4', '>=')) {
+            $this->markTestSkipped('CURRENT_TIMESTAMP with microseconds as default column value is supported since MySQL 5.6.4.');
+        }
+        $sql = <<<SQL
+CREATE TABLE  IF NOT EXISTS `current_timestamp_test`  (
+  `dt` datetime(2) NOT NULL DEFAULT CURRENT_TIMESTAMP(2),
+  `ts` timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8
+SQL;
+
+        $this->getConnection()->createCommand($sql)->execute();
+
+        $schema = $this->getConnection()->getTableSchema('current_timestamp_test');
+
+        $dt = $schema->columns['dt'];
+        $this->assertInstanceOf(Expression::className(), $dt->defaultValue);
+        $this->assertEquals('CURRENT_TIMESTAMP(2)', (string)$dt->defaultValue);
+
+        $ts = $schema->columns['ts'];
+        $this->assertInstanceOf(Expression::className(), $ts->defaultValue);
+        $this->assertEquals('CURRENT_TIMESTAMP(3)', (string)$ts->defaultValue);
     }
 
     public function testGetSchemaNames()
@@ -60,5 +86,36 @@ SQL;
 
         $result['4: check'][2] = false;
         return $result;
+    }
+
+    /**
+     * When displayed in the INFORMATION_SCHEMA.COLUMNS table, a default CURRENT TIMESTAMP is displayed
+     * as CURRENT_TIMESTAMP up until MariaDB 10.2.2, and as current_timestamp() from MariaDB 10.2.3.
+     *
+     * @see https://mariadb.com/kb/en/library/now/#description
+     * @see https://github.com/yiisoft/yii2/issues/15167
+     */
+    public function testAlternativeDisplayOfDefaultCurrentTimestampInMariaDB()
+    {
+        /**
+         * We do not have a real database MariaDB >= 10.2.3 for tests, so we emulate the information that database
+         * returns in response to the query `SHOW FULL COLUMNS FROM ...`
+         */
+        $schema = new \yii\db\mysql\Schema();
+        $column = $this->invokeMethod($schema, 'loadColumnSchema', [[
+            'field' => 'emulated_MariaDB_field',
+            'type' => 'timestamp',
+            'collation' => NULL,
+            'null' => 'NO',
+            'key' => '',
+            'default' => 'current_timestamp()',
+            'extra' => '',
+            'privileges' => 'select,insert,update,references',
+            'comment' => '',
+        ]]);
+
+        $this->assertInstanceOf(\yii\db\mysql\ColumnSchema::className(), $column);
+        $this->assertInstanceOf(Expression::className(), $column->defaultValue);
+        $this->assertEquals('CURRENT_TIMESTAMP', $column->defaultValue);
     }
 }
